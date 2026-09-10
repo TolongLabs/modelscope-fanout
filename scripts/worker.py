@@ -22,9 +22,10 @@ def routing(config):
         raise ValueError('ModelScope upstream must be https://api-inference.modelscope.ai/v1.')
     aliases = {}
     for model in provider.get('models', []):
-        alias, name = model.get('alias'), model.get('name')
+        name = model.get('name')
+        alias = model.get('alias') or name
         if not isinstance(alias, str) or not alias or not isinstance(name, str) or not name:
-            raise ValueError('Each ModelScope model needs a name and a unique alias.')
+            raise ValueError('Each ModelScope model needs a name and a unique route ID.')
         if alias in aliases:
             raise ValueError('Duplicate ModelScope alias.')
         aliases[alias] = name
@@ -76,8 +77,8 @@ def positive(value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=Path.home() / '.cli-proxy-api/config.yaml')
-    parser.add_argument('--list', action='store_true', help='Validate and list live ModelScope aliases; no inference')
-    parser.add_argument('--model', default='ms-qwen3.5-122b')
+    parser.add_argument('--list', action='store_true', help='Validate and list live ModelScope upstream IDs; no inference')
+    parser.add_argument('--model', default='Qwen/Qwen3.8-27B', help='ModelScope upstream ID')
     parser.add_argument('--cwd', type=Path)
     parser.add_argument('--brief', type=Path)
     parser.add_argument('--log', type=Path, help='New JSON output path; stderr stored alongside')
@@ -100,18 +101,23 @@ def main():
     except Exception:
         parser.exit(2, 'Cannot verify live ModelScope routes. Start/check CLIProxyAPI; no worker launched.\n')
     if args.list:
-        for alias in sorted(available):
-            print(f'{alias}\t{aliases[alias]}')
+        for name in sorted({aliases[alias] for alias in available}):
+            print(name)
         return 0 if available else 2
-    if args.model not in available:
-        parser.exit(2, 'Selected alias is not a live ModelScope route; no fallback.\n')
+    routes = sorted(alias for alias in available if aliases[alias] == args.model)
+    if routes:
+        route = args.model if args.model in routes else routes[0]
+    elif args.model in available:
+        route = args.model
+    else:
+        parser.exit(2, 'Selected model is not a live ModelScope route; no fallback.\n')
     if not args.cwd or not args.cwd.is_dir() or not args.brief or not args.brief.is_file() or not args.log:
         parser.error('--cwd directory, --brief file and --log are required.')
     config_dir = Path.home() / '.modelscope-fanout'
     config_dir.mkdir(mode=0o700, exist_ok=True)
     args.log.parent.mkdir(parents=True, exist_ok=True)
-    env = environment(os.environ, str(config_dir), port, token, args.model)
-    command = ['claude', '-p', '--model', args.model, '--setting-sources', '',
+    env = environment(os.environ, str(config_dir), port, token, route)
+    command = ['claude', '-p', '--model', route, '--setting-sources', '',
                '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
                '--settings', '{"disableAllHooks":true}',
                '--tools', '' if args.analysis else 'Read,Edit,Write,Glob,Grep',

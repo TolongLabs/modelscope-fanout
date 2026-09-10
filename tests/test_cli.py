@@ -15,6 +15,7 @@ SCRIPT = Path(__file__).parents[1] / 'scripts' / 'worker.py'
 class Catalog(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         body = json.dumps({'data': [{'id': 'ms-test', 'owned_by': 'modelscope'},
+                                    {'id': 'Qwen/Direct', 'owned_by': 'modelscope'},
                                     {'id': 'other', 'owned_by': 'openrouter'}]}).encode()
         self.send_response(200)
         self.end_headers()
@@ -66,8 +67,39 @@ class CliTests(unittest.TestCase):
     def test_lists_only_provider_aliases_without_inference(self):
         result = self.run_cli('--list')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'ms-test\tQwen/Test\n')
+        self.assertEqual(result.stdout, 'Qwen/Test\n')
         self.assertNotIn('private-fixture-token', result.stdout + result.stderr)
+
+    def test_upstream_id_resolves_existing_route(self):
+        self.fake.write_text('#!/usr/bin/env python3\nimport json,os,sys\n'
+                             'assert os.environ["ANTHROPIC_MODEL"] == "ms-test"\n'
+                             'assert sys.argv[sys.argv.index("--model") + 1] == "ms-test"\n'
+                             'sys.stdin.read()\n'
+                             'print(json.dumps({"type":"result","subtype":"success"}))\n')
+        result = self.dispatch('--model', 'Qwen/Test')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Model=Qwen/Test', result.stdout)
+
+    def test_dispatch_without_configured_alias(self):
+        config = yaml.safe_load(self.config.read_text())
+        config['openai-compatibility'][0]['models'] = [{'name': 'Qwen/Direct'}]
+        self.config.write_text(yaml.safe_dump(config))
+        self.fake.write_text('#!/usr/bin/env python3\nimport json,os,sys\n'
+                             'assert os.environ["ANTHROPIC_MODEL"] == "Qwen/Direct"\n'
+                             'assert sys.argv[sys.argv.index("--model") + 1] == "Qwen/Direct"\n'
+                             'sys.stdin.read()\n'
+                             'print(json.dumps({"type":"result","subtype":"success"}))\n')
+        result = self.dispatch('--model', 'Qwen/Direct')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_default_is_qwen_38_27b(self):
+        config = yaml.safe_load(self.config.read_text())
+        config['openai-compatibility'][0]['models'][0]['name'] = 'Qwen/Qwen3.8-27B'
+        self.config.write_text(yaml.safe_dump(config))
+        result = self.run_cli('--cwd', str(self.root), '--brief', str(self.brief),
+                              '--log', str(self.root / 'default.json'))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Model=Qwen/Qwen3.8-27B', result.stdout)
 
     def test_refuses_non_modelscope_model(self):
         result = self.run_cli('--model', 'other')

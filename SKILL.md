@@ -11,11 +11,13 @@ Same headless harness, different economics: **maximize useful work per upstream 
 ## Preflight
 
 Run `python3 ~/.claude/skills/modelscope-fanout/scripts/worker.py --list`.
-Only live aliases in the local `modelscope` provider qualify. Missing route/auth means stop; never silently fall back to
+Only models with live routes in the local `modelscope` provider qualify. Select upstream API IDs; the launcher resolves
+optional existing proxy aliases internally, without any `cc` dependency. Missing route/auth means stop; never silently fall back to
 OpenRouter, OAuth or the Claude plan. Keys stay in the existing proxy config, never in briefs or logs.
 
-Default to `ms-qwen3.5-122b` if listed; honor a user-selected ModelScope alias. Other aliases require a bounded tool-edit
-smoke test before bulk work. Catalog membership is not inference entitlement or agent compatibility.
+Default to `Qwen/Qwen3.8-27B` if listed; honor a user-selected ModelScope upstream API ID. This cost-oriented choice
+combines strong published coding results with a passing local editing test; its 1-Magicube rate is user-reported,
+not independently measured here. See README for benchmark sources, billing caveats and local results. A new route needs a bounded tool-edit smoke test before bulk work; catalog membership is not compatibility.
 
 ## Budget And Grouping
 
@@ -52,6 +54,41 @@ exception. Do not pad prompts
 with entire repositories. Larger prompts reduce discovery turns, not context limits. Batch independent tool calls;
 retain Read-before-Edit and necessary verification. Keep architecture, security decisions and ambiguous work yourself.
 
+### A Call-Efficient Brief
+
+Pack useful context, not tokens. Reuse relevant facts the parent already has; do not buy a separate reconnaissance
+worker to rediscover them. Include exact input paths for anything still missing. Keep enough context/output headroom
+for tool results and changes; split at coherent ownership boundaries when the whole job will not fit.
+
+For a bounded multi-file change, the execution contract is:
+
+1. Read missing inputs together where independent. Existing files still require Read before Edit.
+2. Apply independent changes in a grouped pass where supported; preserve genuine read/edit dependencies.
+3. Return one short completion report; the parent runs acceptance checks and reviews consequential changes.
+
+For example, one worker can receive this whole brief instead of separate discovery, planning and per-file workers:
+
+```text
+Own state.txt and labels.txt, and nothing else. Do not run git or shell commands.
+Read input.json and state.txt before editing; batch the two independent reads if supported.
+In state.txt, replace only status=pending with status=complete using Edit. Preserve all other bytes.
+Write labels.txt from input.json's labels array: uppercase, original order, one per line, final newline.
+Do not change input.json. Batch the independent Edit and Write where supported.
+Acceptance: exact preserved state.txt content apart from the replacement; correct labels; no extra files.
+Return changed paths and denied operations only. The parent will check exact bytes.
+```
+
+A brief with this task and batching guidance produced six exact-output passes out of eight tested routes; it did not
+establish minimum billed calls.
+Seven completed runs still reported five turns. Requesting batching does not guarantee the model or harness batches.
+Parallelism saves elapsed time, not necessarily Magicubes. Avoid plan-only workers, repeated discovery and tiny follow-up
+prompts for facts already known, but retain verification: a wrong one-call answer is not efficient.
+
+Choose by total measured Magicubes across all attempts and repairs per accepted task. Compare matched tasks and tools;
+track failures as spending, not just successful runs. Unknown billing stays unmeasured. At equal quality, a model billed
+at twice the per-call rate must use fewer than half as many charged calls to be cheaper. Benchmarks shortlist candidates;
+they do not measure this workflow's call efficiency.
+
 ## Dispatch
 
 Give each editing worker an isolated worktree or disposable directory. Never share output ownership.
@@ -59,7 +96,7 @@ Give each editing worker an isolated worktree or disposable directory. Never sha
 ```bash
 python3 ~/.claude/skills/modelscope-fanout/scripts/worker.py \
   --cwd "$WORKTREE" --brief "$BRIEF" --log "$LOG" \
-  --model ms-qwen3.5-122b --max-turns 8 --timeout 600
+  --model Qwen/Qwen3.8-27B --max-turns 8 --timeout 600
 ```
 
 Launch independent chunks together using background Bash calls; await completion notifications, not polling.
