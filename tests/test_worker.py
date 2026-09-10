@@ -26,6 +26,10 @@ class WorkerTests(unittest.TestCase):
     def test_only_modelscope_aliases(self):
         self.assertEqual(self.worker.routing(self.config)[2], {'ms-test': 'Qwen/Test'})
 
+    def test_alias_is_optional(self):
+        del self.config['openai-compatibility'][1]['models'][0]['alias']
+        self.assertEqual(self.worker.routing(self.config)[2], {'Qwen/Test': 'Qwen/Test'})
+
     def test_reject_missing_provider(self):
         self.config['openai-compatibility'].pop(1)
         with self.assertRaises(ValueError):

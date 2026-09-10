@@ -88,7 +88,7 @@ If a task needs your judgement or your conversation context, you do not need thi
      --cwd "$WORKTREE" \
      --brief "$BRIEF" \
      --log "$LOG" \
-     --model ms-qwen3.5-122b \
+     --model Qwen/Qwen3.8-27B \
      --max-turns 8 \
      --timeout 600
    ```
@@ -96,7 +96,7 @@ If a task needs your judgement or your conversation context, you do not need thi
    Or ask Claude Code to prepare and supervise the work:
 
    ```text
-   /modelscope-fanout Bundle these related changes into one worker using ms-qwen3.5-122b, then verify the results.
+   /modelscope-fanout Bundle these related changes into one worker using Qwen/Qwen3.8-27B, then verify the results.
    ```
 
 1. **Verify.** Read the JSON report, check the actual diff and unexpected files, and run the tests yourself. A successful
@@ -111,32 +111,53 @@ If a task needs your judgement or your conversation context, you do not need thi
 
 ## Which Model to Use
 
-Only configured aliases that the live proxy catalog identifies as ModelScope models are offered.
-**`ms-qwen3.5-122b` is the default**: it passed exact-output creation, two simultaneous multi-file workers and a
-Read → Edit test. Availability and entitlement can change; run `--list` before dispatch.
+**`Qwen/Qwen3.8-27B` is the default**, chosen for strong published coding performance, a passing local headless editing
+test and a user-reported rate of **1 Magicube per call**. That rate was not independently measured in this comparison;
+it is **not a proven Magicube-efficiency winner**. Honor an explicitly selected model; never silently substitute another.
 
-| ModelScope ID                       | Alias                | Notes                                                           |
-| ----------------------------------- | -------------------- | --------------------------------------------------------------- |
-| `Qwen/Qwen3.5-122B-A10B`            | `ms-qwen3.5-122b`    | **Default.** Passed bounded headless worker tests               |
-| `Qwen/Qwen3-Coder-30B-A3B-Instruct` | `ms-qwen3-coder`     | Coder-tuned; instruction and path failures occurred in testing  |
-| `Qwen/Qwen3.5-397B-A17B`            | `ms-qwen3.5-397b`    | Direct inference tested; headless tool compatibility unverified |
-| `deepseek-ai/DeepSeek-V4-Pro-0813`  | `ms-deepseek-v4-pro` | Direct inference tested; headless tool compatibility unverified |
-| `zai-org/GLM-5.2`                   | `ms-glm-5.2`         | Direct inference tested; headless tool compatibility unverified |
-| `Qwen/Qwen3.8-27B`                  | `ms-qwen3.8-27b`     | Direct inference tested; headless tool compatibility unverified |
-| `zai-org/GLM-4.7-Flash`             | `ms-glm-4.7-flash`   | Direct inference tested; headless tool compatibility unverified |
-| `stepfun-ai/Step-3.5-Flash`         | `ms-step-3.5-flash`  | Direct inference tested; headless tool compatibility unverified |
+Select upstream API IDs directly; no `cc` launcher or custom alias names are required. The launcher resolves an existing
+proxy alias internally when necessary. `--list` prints upstream IDs with validated live ModelScope routes.
+Availability and entitlement can change; run it before dispatch.
 
-These mappings were checked on 2026-09-10, not asserted as a universal catalog. Add missing mappings under your existing
-`modelscope` provider's `models` list, without changing its credentials. For the default:
+| ModelScope ID                                                                                   | Published Coding Evidence                                                           | Local Headless Result                                            |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`Qwen/Qwen3.5-122B-A10B`](https://huggingface.co/Qwen/Qwen3.5-122B-A10B)                       | SWE-bench Verified 72.0; Terminal Bench 2: 49.4                                     | Pass; 5 reported turns                                           |
+| [`Qwen/Qwen3-Coder-30B-A3B-Instruct`](https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct) | SWE-bench Verified 51.60 with OpenHands, per [SWE-bench](https://www.swebench.com/) | Pass; 5 turns. Earlier instruction/path failures remain relevant |
+| [`Qwen/Qwen3.5-397B-A17B`](https://huggingface.co/Qwen/Qwen3.5-397B-A17B)                       | SWE-bench Verified 76.4; Terminal Bench 2: 52.5                                     | Pass; 5 turns                                                    |
+| [`deepseek-ai/DeepSeek-V4-Pro-0813`](https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813)   | Terminal Bench 2.1: 87.9; NL2Repo 61.5                                              | Output mismatch: omitted required final newline; 5 turns         |
+| [`zai-org/GLM-5.2`](https://huggingface.co/zai-org/GLM-5.2)                                     | SWE-bench Pro 62.1; Terminal Bench 2.1: 81.0 with Terminus-2                        | Pass; 5 turns                                                    |
+| [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B)                                   | SWE-bench Pro 61.7; Terminal Bench 2.1: 73.0 with Terminus                          | Pass; 5 turns                                                    |
+| [`zai-org/GLM-4.7-Flash`](https://huggingface.co/zai-org/GLM-4.7-Flash)                         | SWE-bench Verified 59.2; LiveCodeBench v6: 64.0                                     | Timed out at 180 seconds; no completed result                    |
+| [`stepfun-ai/Step-3.5-Flash`](https://huggingface.co/stepfun-ai/Step-3.5-Flash)                 | SWE-bench Verified 74.4; Terminal-Bench 2.0: 51.0                                   | Pass; 5 turns                                                    |
+
+Sources checked on 2026-09-10. Scores are published results, not independently reproduced here. SWE-bench Verified and
+Pro are different evaluations; Terminal-Bench versions, harnesses, reasoning budgets and context management also differ.
+The Coder score was visible in the official leaderboard's search index, not its fetched dynamic table. These numbers
+are not one comparable leaderboard and do not establish the hosted endpoint's revision or reasoning configuration.
+
+Qwen3.8-27B's published SWE-bench Pro result is close to GLM-5.2's, while GLM has a higher published Terminal Bench score.
+Both passed the local output checks with five reported turns. There is no measured reduction in charged calls to justify
+preferring GLM if its per-call rate is higher; GLM remains an explicitly selectable alternative, with its tier unverified.
+One small trial per model cannot rank reliability or real-world coding quality.
+
+DeepSeek's higher published Terminal Bench score uses a different harness; its missing newline is a small local defect,
+not proof of general inferiority. All seven completed local runs reported five turns, so this test establishes no
+call-efficiency advantage.
+
+Add a missing model under the existing `modelscope` provider's `models` list, without changing credentials:
 
 ```yaml
 models:
-  - name: Qwen/Qwen3.5-122B-A10B
-    alias: ms-qwen3.5-122b
+  - name: Qwen/Qwen3.8-27B
 ```
 
+An optional `alias` remains supported for existing proxy configurations. No proxy configuration is rewritten by the
+launcher. Only routes assigned to ModelScope in both configuration and the live catalog are eligible.
+
 Standard inference was observed at **1 Magicube per call**, Flagship at **2**. Individual Standard billing evidence
-exists for `ms-qwen3-coder`; the other models' individual tiers, including the default's, remain unverified.
+exists for `Qwen/Qwen3-Coder-30B-A3B-Instruct`; the other models' tiers, including the default's, remain unverified.
+Measure total Magicubes across attempts and repairs divided by accepted tasks. At equal quality, a 2-Magicube model
+must use fewer than half as many charged calls as a 1-Magicube model to be cheaper; exactly half ties.
 Check actual spending on [ModelScope Usage](https://www.modelscope.ai/magicube/usage?tab=consume).
 
 ## How It Stays Safe
@@ -171,8 +192,8 @@ The launcher provides two modes and never enables `bypassPermissions`:
   Small related tasks belong in one bundled worker; dependent chunks run sequentially.
 - **A Worker Has None of Your Context.** Include relevant `CLAUDE.md` and `AGENTS.md` instructions explicitly. Do not
   rely on auto-discovery, and resolve conflicting examples before dispatch.
-- **Small Tests Do Not Prove Every Task.** Large code changes, model-specific effort handling and the unverified models
-  still need bounded acceptance tests and parent review.
+- **Small Tests Do Not Prove Every Task.** Large code changes and model-specific effort handling still need bounded
+  acceptance tests and parent review. Published benchmark scores do not establish cost efficiency on this harness.
 
 ## Under the Hood
 
@@ -184,7 +205,7 @@ Every worker is one command, and every failure shows up around it:
 ```bash
 python3 ~/.claude/skills/modelscope-fanout/scripts/worker.py \
   --cwd "$WORKTREE" --brief "$BRIEF" --log "$LOG" \
-  --model ms-qwen3.5-122b --max-turns 8 --timeout 600
+  --model Qwen/Qwen3.8-27B --max-turns 8 --timeout 600
 ```
 
 - **The Brief Goes Through stdin.** The launcher reads the file and states the working directory explicitly before
@@ -227,13 +248,27 @@ parent's terminal; inspect private logs deliberately.
 python3 -m unittest discover -s ~/.claude/skills/modelscope-fanout/tests -v
 ```
 
-**14 offline tests passed**, covering routing, environment isolation, logs, denials, errors and timeouts.
-Live `ms-qwen3.5-122b` checks passed an exact-output creation test in two turns, two simultaneous multi-file workers
-in three turns each, and a Read → Edit test in three turns with untargeted content preserved. The parallel workers
-produced no extra files or permission denials. Test spending was not measured.
+**18 offline tests passed**, covering upstream-ID selection, the default, optional aliases, routing, environment
+isolation, logs, denials, errors and timeouts.
 
-These are bounded smoke tests, not evidence for large tasks or every model. Raw logs remain local; never publish
-credentials, account screenshots or private session details with test results.
+On 2026-09-10, all eight models received the same brief: read two inputs, edit one state line while preserving other
+bytes, and create an uppercase labels file with a final newline. Each run allowed six turns and 180 seconds; two ran
+at a time, without automatic redispatch. Parent assertions checked exact file bytes, input preservation and file names.
+The test used existing proxy routes; the model table records each outcome.
+
+Six passed all output checks. DeepSeek completed but omitted the final newline. GLM-4.7-Flash timed out without a
+completed JSON result; no cause is established. All seven completed runs reported five turns and no permission denials.
+That does not prove five charged calls or actual tool batching. Test spending was not measured, and no matched
+light-prompt versus context-rich-prompt billing comparison was performed. After the launcher change, a separate smaller
+GLM-5.2 test using the default upstream-ID selection passed exact Edit/Write and file-preservation checks in four
+reported turns, without denials. After selecting Qwen3.8-27B as the default, the same smaller test also passed in four
+reported turns with exact outputs and no denials. Existing shared proxy configuration was unchanged; alias-free routing
+was tested offline.
+
+Earlier `Qwen/Qwen3.5-122B-A10B` checks passed exact-output creation in two turns, two simultaneous multi-file workers
+in three turns each, and Read → Edit in three turns with untargeted content preserved. Earlier Coder instruction/path
+failures are not erased by its latest pass. These are smoke tests, not broad coding or reliability benchmarks.
+Raw logs remain local; never publish credentials, account screenshots or private session details with test results.
 
 </details>
 
