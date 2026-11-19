@@ -6,7 +6,7 @@ description: Use when independent, well-specified work needs headless Claude Cod
 # ModelScope Fan-Out
 > Prefer `fanout run --harness modelscope` when `command -v fanout` succeeds: it picks the model, falls back and reports cost. This skill stays as the manual path.
 
-The worker does the bulk; you keep the judgement. Adapted from [Claude Fan-Out](https://github.com/TolongLabs/claude-fanout).
+The worker does the bulk; you keep the judgement. Adapted from [OpenRouter Fan-Out](https://github.com/TolongLabs/openrouter-fanout).
 Same headless harness, different economics: **maximize useful work per upstream call**, within model context/output limits.
 
 ## Preflight
